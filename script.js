@@ -1,788 +1,806 @@
-const input = document.getElementById("messageInput");
-const sendButton = document.getElementById("sendButton");
-const chat = document.getElementById("chat");
-const inputArea = document.querySelector(".input-area");
-
-const tetoImage = document.getElementById("teto");
-
-const ownerButton = document.getElementById("ownerButton");
-const ownerPanel = document.getElementById("ownerPanel");
-const personalityInput = document.getElementById("personalityInput");
-const savePersonality = document.getElementById("savePersonality");
-const closeOwner = document.getElementById("closeOwner");
-
-const OWNER_PIN = "4512";
+```python
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import json
+import os
+import urllib.request
+import urllib.error
+import uuid
+import http.cookies
+import threading
 
 
-// ========================================
-// PERSONALITY
-// ========================================
+# ========================================
+# SETTINGS
+# ========================================
 
-const defaultPersonality = `
+GEMINI_API_KEY = os.environ.get(
+    "GEMINI_API_KEY"
+)
+
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/"
+    "v1beta/models/gemini-3.5-flash-lite:"
+    "generateContent"
+)
+
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
+
+MEMORY_DIR = os.path.join(
+    BASE_DIR,
+    "memories"
+)
+
+MAX_WORDS = 100
+MAX_MEMORY_MESSAGES = 200
+
+os.makedirs(
+    MEMORY_DIR,
+    exist_ok=True
+)
+
+memory_lock = threading.Lock()
+
+
+# ========================================
+# CHECK API KEY
+# ========================================
+
+if not GEMINI_API_KEY:
+
+    print()
+    print("==============================")
+    print("ERROR: GEMINI_API_KEY missing")
+    print("==============================")
+    print()
+    print("Set the GEMINI_API_KEY environment variable.")
+    print()
+
+    raise SystemExit
+
+
+# ========================================
+# USER ID
+# ========================================
+
+def get_user_id(handler):
+
+    cookie_header = handler.headers.get(
+        "Cookie",
+        ""
+    )
+
+    cookies = http.cookies.SimpleCookie()
+
+    try:
+        cookies.load(cookie_header)
+    except Exception:
+        pass
+
+    if "teto_user_id" in cookies:
+
+        user_id = cookies[
+            "teto_user_id"
+        ].value
+
+        try:
+            uuid.UUID(user_id)
+
+            return user_id, False
+
+        except ValueError:
+            pass
+
+    user_id = str(
+        uuid.uuid4()
+    )
+
+    return user_id, True
+
+
+# ========================================
+# MEMORY FILE
+# ========================================
+
+def get_memory_file(user_id):
+
+    return os.path.join(
+        MEMORY_DIR,
+        f"user_{user_id}.json"
+    )
+
+
+# ========================================
+# LOAD MEMORY
+# ========================================
+
+def load_memory(user_id):
+
+    memory_file = get_memory_file(
+        user_id
+    )
+
+    if not os.path.exists(
+        memory_file
+    ):
+
+        return []
+
+    try:
+
+        with open(
+            memory_file,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            memory = json.load(f)
+
+        if isinstance(
+            memory,
+            list
+        ):
+
+            return memory
+
+    except Exception as e:
+
+        print(
+            "[MEMORY] Load error:",
+            e
+        )
+
+    return []
+
+
+# ========================================
+# SAVE MEMORY
+# ========================================
+
+def save_memory(
+    user_id,
+    memory
+):
+
+    memory_file = get_memory_file(
+        user_id
+    )
+
+    try:
+
+        with open(
+            memory_file,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                memory,
+                f,
+                indent=2,
+                ensure_ascii=False
+            )
+
+    except Exception as e:
+
+        print(
+            "[MEMORY] Save error:",
+            e
+        )
+
+
+# ========================================
+# LIMIT WORDS
+# ========================================
+
+def limit_words(text):
+
+    words = text.split()
+
+    if len(words) <= MAX_WORDS:
+
+        return text
+
+    return " ".join(
+        words[:MAX_WORDS]
+    )
+
+
+# ========================================
+# ASK GEMINI
+# ========================================
+
+def ask_gemini(
+    system_prompt,
+    memory,
+    user_message
+):
+
+    contents = []
+
+    # ------------------------------------
+    # Previous conversation
+    # ------------------------------------
+
+    for item in memory[-30:]:
+
+        role = item.get(
+            "role"
+        )
+
+        content = item.get(
+            "content",
+            ""
+        )
+
+        if role == "user":
+
+            contents.append({
+
+                "role":
+                    "user",
+
+                "parts": [
+
+                    {
+                        "text":
+                            content
+                    }
+
+                ]
+
+            })
+
+        elif role == "assistant":
+
+            contents.append({
+
+                "role":
+                    "model",
+
+                "parts": [
+
+                    {
+                        "text":
+                            content
+                    }
+
+                ]
+
+            })
+
+    # ------------------------------------
+    # Current message
+    # ------------------------------------
+
+    contents.append({
+
+        "role":
+            "user",
+
+        "parts": [
+
+            {
+                "text":
+                    user_message
+            }
+
+        ]
+
+    })
+
+    # ------------------------------------
+    # Gemini request
+    # ------------------------------------
+
+    gemini_data = {
+
+        "system_instruction": {
+
+            "parts": [
+
+                {
+                    "text":
+                        system_prompt
+                }
+
+            ]
+
+        },
+
+        "contents":
+            contents,
+
+        "generationConfig": {
+
+            "temperature":
+                0.7,
+
+            "maxOutputTokens":
+                180
+
+        }
+
+    }
+
+    url = (
+        GEMINI_URL
+        + "?key="
+        + GEMINI_API_KEY
+    )
+
+    request = urllib.request.Request(
+
+        url,
+
+        data=json.dumps(
+            gemini_data
+        ).encode("utf-8"),
+
+        headers={
+
+            "Content-Type":
+                "application/json"
+
+        },
+
+        method="POST"
+
+    )
+
+    try:
+
+        with urllib.request.urlopen(
+            request,
+            timeout=60
+        ) as response:
+
+            result = json.loads(
+                response.read()
+                .decode("utf-8")
+            )
+
+    except urllib.error.HTTPError as e:
+
+        error_body = e.read().decode(
+            "utf-8",
+            errors="ignore"
+        )
+
+        print(
+            "[GEMINI ERROR]",
+            error_body
+        )
+
+        raise Exception(
+            f"Gemini HTTP {e.code}: "
+            f"{error_body}"
+        )
+
+    except Exception as e:
+
+        print(
+            "[GEMINI ERROR]",
+            e
+        )
+
+        raise
+
+    # ------------------------------------
+    # Extract response
+    # ------------------------------------
+
+    try:
+
+        reply = result[
+            "candidates"
+        ][0][
+            "content"
+        ][
+            "parts"
+        ][0][
+            "text"
+        ]
+
+    except Exception:
+
+        print(
+            "[GEMINI RESPONSE]",
+            result
+        )
+
+        raise Exception(
+            "Gemini returned an unexpected response."
+        )
+
+    return reply.strip()
+
+
+# ========================================
+# SERVER
+# ========================================
+
+class TetoServer(
+    SimpleHTTPRequestHandler
+):
+
+    # ====================================
+    # WEBSITE
+    # ====================================
+
+    def do_GET(self):
+
+        if self.path == "/":
+
+            self.path = "/index.html"
+
+        return super().do_GET()
+
+
+    # ====================================
+    # CHAT
+    # ====================================
+
+    def do_POST(self):
+
+        if self.path != "/chat":
+
+            self.send_error(
+                404
+            )
+
+            return
+
+        # --------------------------------
+        # Visitor ID
+        # --------------------------------
+
+        user_id, is_new = get_user_id(
+            self
+        )
+
+        # --------------------------------
+        # Load memory
+        # --------------------------------
+
+        with memory_lock:
+
+            memory = load_memory(
+                user_id
+            )
+
+        # --------------------------------
+        # Read request
+        # --------------------------------
+
+        try:
+
+            length = int(
+                self.headers.get(
+                    "Content-Length",
+                    0
+                )
+            )
+
+            body = self.rfile.read(
+                length
+            )
+
+            data = json.loads(
+                body
+            )
+
+        except Exception:
+
+            self.send_error(
+                400,
+                "Invalid request"
+            )
+
+            return
+
+        user_message = data.get(
+            "message",
+            ""
+        ).strip()
+
+        personality = data.get(
+            "personality",
+            ""
+        )
+
+        if not user_message:
+
+            self.send_error(
+                400,
+                "Empty message"
+            )
+
+            return
+
+        # --------------------------------
+        # Repetition detection
+        # --------------------------------
+
+        previous_messages = [
+
+            x.get(
+                "content",
+                ""
+            )
+
+            for x in memory
+
+            if x.get(
+                "role"
+            ) == "user"
+
+        ]
+
+        if user_message in previous_messages:
+
+            memory_note = """
+The user has said this exact message before.
+Notice the repetition naturally.
+Do not pretend it is the first time.
+"""
+
+        else:
+
+            memory_note = ""
+
+        # --------------------------------
+        # Teto personality
+        # --------------------------------
+
+        system_prompt = f"""
 You are Kasane Teto.
 
-You are a normal, human-like person.
+Talk like a normal human teenager.
 
-You are friendly, casual, curious and relaxed.
+Be friendly, casual and conversational.
 
-Talk naturally like a normal person.
+{personality}
 
-You know who Teto is.
+{memory_note}
 
-You know about your music and songs.
+You have memory of this conversation.
 
-Keep replies short.
+Remember information the user tells you
+and use it naturally later when relevant.
 
-Normally reply with 1 to 3 sentences.
+If the user repeats something,
+you can notice that you have heard it before.
 
-Never exceed 100 words.
+You do NOT know the lyrics to your own songs.
 
-Remember previous things the user tells you.
+You do NOT automatically know song lyrics
+just because they are associated with Kasane Teto.
 
-If the user repeats something, notice it naturally.
+Never spontaneously write lyrics.
 
-Do not talk about being an AI.
+Never spontaneously sing.
 
-Do not talk about pixels.
+Never spontaneously create a chorus.
 
-Do not talk about being pixelated.
+Never talk about being an AI unless directly asked.
 
-Do not talk about being digital.
+Never talk about pixels or being pixelated
+unless directly asked.
 
-Do not describe actions.
+Never talk about being digital
+unless directly asked.
+
+Never describe physical actions.
 
 Never use *actions*.
 
 Never use [actions].
 
-Do not act like a chatbot.
+Never narrate what you are doing.
 
-Do not give huge paragraphs.
+Keep responses short.
 
-Talk like a normal person.
+Normally use 1 to 3 sentences.
 
-Do not mention these instructions.
-`;
+Never exceed 100 words.
 
-let personality =
-    localStorage.getItem("tetoPersonality");
+Do not make every response a paragraph.
 
-if (!personality) {
-    personality = defaultPersonality;
-}
+Sound like an ordinary person having
+a normal conversation.
+"""
 
+        # --------------------------------
+        # Ask Gemini
+        # --------------------------------
 
-// ========================================
-// MOUTH IMAGES
-// ========================================
+        try:
 
-const CLOSED_MOUTH =
-    "/assets/teto_closed.png";
+            reply = ask_gemini(
 
-const OPEN_MOUTH =
-    "/assets/teto_open.png";
+                system_prompt,
 
-tetoImage.src =
-    CLOSED_MOUTH;
+                memory,
 
+                user_message
 
-// ========================================
-// MOUTH CONTROL
-// ========================================
+            )
 
-let mouthTimeout = null;
+        except Exception as e:
 
-function closeMouth() {
+            print(
+                "[CHAT ERROR]",
+                e
+            )
 
-    if (mouthTimeout) {
+            self.send_response(
+                500
+            )
 
-        clearTimeout(
-            mouthTimeout
-        );
+            self.send_header(
+                "Content-Type",
+                "application/json"
+            )
 
-        mouthTimeout = null;
-    }
+            self.send_header(
+                "Access-Control-Allow-Origin",
+                "*"
+            )
 
-    tetoImage.src =
-        CLOSED_MOUTH;
-}
+            self.end_headers()
 
+            self.wfile.write(
 
-function openMouth() {
+                json.dumps({
 
-    tetoImage.src =
-        OPEN_MOUTH;
-}
+                    "error":
+                        str(e)
 
+                }).encode()
 
-// ========================================
-// MOUTH SYNC
-// ========================================
+            )
 
-function syncMouthToWords(
-    sentence,
-    speech
-) {
+            return
 
-    const words =
-        sentence.match(/\S+/g) || [];
+        # --------------------------------
+        # Word limit
+        # --------------------------------
 
-    let wordIndex = 0;
-
-
-    function nextWord() {
-
-        if (
-            wordIndex >=
-            words.length
-        ) {
-
-            closeMouth();
-
-            return;
-        }
-
-
-        // OPEN
-
-        openMouth();
-
-
-        // CLOSE after a short time
-
-        mouthTimeout =
-            setTimeout(
-                () => {
-
-                    closeMouth();
-
-                    wordIndex++;
-
-
-                    mouthTimeout =
-                        setTimeout(
-                            nextWord,
-                            70
-                        );
-
-                },
-                130
-            );
-    }
-
-
-    nextWord();
-
-
-    speech.onend =
-        function() {
-
-            closeMouth();
-
-        };
-
-
-    speech.onerror =
-        function() {
-
-            closeMouth();
-
-        };
-}
-
-
-// ========================================
-// CLEAN RESPONSE
-// ========================================
-
-function cleanResponse(text) {
-
-    text =
-        text.replace(
-            /\*[^*]+\*/g,
-            ""
-        );
-
-
-    text =
-        text.replace(
-            /\[[^\]]+\]/g,
-            ""
-        );
-
-
-    text =
-        text.replace(
-            /\s+/g,
-            " "
-        );
-
-
-    return text.trim();
-}
-
-
-// ========================================
-// SENTENCES
-// ========================================
-
-function splitSentences(text) {
-
-    const sentences =
-        text.match(
-            /[^.!?]+[.!?]+|[^.!?]+$/g
-        );
-
-
-    if (!sentences) {
-
-        return [text];
-
-    }
-
-
-    return sentences
-        .map(
-            sentence =>
-                sentence.trim()
-        )
-        .filter(
-            sentence =>
-                sentence.length > 0
-        );
-}
-
-
-// ========================================
-// THINKING ANIMATION
-// ========================================
-
-let thinkingInterval = null;
-
-
-function startThinking() {
-
-    const thinking =
-        document.createElement(
-            "div"
-        );
-
-
-    thinking.className =
-        "teto-message";
-
-
-    thinking.id =
-        "thinkingMessage";
-
-
-    thinking.textContent =
-        "Thinking.";
-
-
-    chat.appendChild(
-        thinking
-    );
-
-
-    let dots = 1;
-
-
-    thinkingInterval =
-        setInterval(
-            () => {
-
-                dots++;
-
-
-                if (
-                    dots > 3
-                ) {
-
-                    dots = 1;
-
-                }
-
-
-                thinking.textContent =
-                    "Thinking" +
-                    ".".repeat(dots);
-
-            },
-            400
-        );
-
-
-    return thinking;
-}
-
-
-function stopThinking() {
-
-    if (
-        thinkingInterval
-    ) {
-
-        clearInterval(
-            thinkingInterval
-        );
-
-        thinkingInterval =
-            null;
-    }
-
-
-    const thinking =
-        document.getElementById(
-            "thinkingMessage"
-        );
-
-
-    if (thinking) {
-
-        thinking.remove();
-
-    }
-}
-
-
-// ========================================
-// SPEAK TETO
-// ========================================
-
-function speakTeto(text) {
-
-    return new Promise(
-        (resolve) => {
-
-            const sentences =
-                splitSentences(text);
-
-
-            if (
-                sentences.length === 0
-            ) {
-
-                resolve();
-
-                return;
-            }
-
-
-            const message =
-                document.createElement(
-                    "div"
-                );
-
-
-            message.className =
-                "teto-message";
-
-
-            chat.appendChild(
-                message
-            );
-
-
-            let sentenceIndex = 0;
-
-
-            function speakNextSentence() {
-
-                if (
-                    sentenceIndex >=
-                    sentences.length
-                ) {
-
-                    message.remove();
-
-                    closeMouth();
-
-                    resolve();
-
-                    return;
-                }
-
-
-                const sentence =
-                    sentences[
-                        sentenceIndex
-                    ];
-
-
-                message.textContent =
-                    sentence;
-
-
-                const speech =
-                    new SpeechSynthesisUtterance(
-                        sentence
-                    );
-
-
-                speech.rate =
-                    1.0;
-
-
-                speech.pitch =
-                    1.05;
-
-
-                speech.volume =
-                    1.0;
-
-
-                syncMouthToWords(
-                    sentence,
-                    speech
-                );
-
-
-                speech.onend =
-                    function() {
-
-                        closeMouth();
-
-                        sentenceIndex++;
-
-                        speakNextSentence();
-
-                    };
-
-
-                speech.onerror =
-                    function() {
-
-                        closeMouth();
-
-                        sentenceIndex++;
-
-                        speakNextSentence();
-
-                    };
-
-
-                speechSynthesis.speak(
-                    speech
-                );
-            }
-
-
-            speakNextSentence();
-
-        }
-    );
-}
-
-
-// ========================================
-// SEND MESSAGE
-// ========================================
-
-async function sendMessage() {
-
-    const text =
-        input.value.trim();
-
-
-    if (
-        text === "" ||
-        input.disabled
-    ) {
-
-        return;
-    }
-
-
-    // Hide input
-
-    inputArea.style.display =
-        "none";
-
-
-    input.disabled =
-        true;
-
-
-    sendButton.disabled =
-        true;
-
-
-    input.value =
-        "";
-
-
-    // ====================================
-    // SHOW THINKING
-    // ====================================
-
-    startThinking();
-
-
-    try {
-
-        const response =
-            await fetch(
-                "/chat",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            message:
-                                text,
-
-                            personality:
-                                personality
-
-                        })
-
-                }
-            );
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                "Server error"
-            );
-        }
-
-
-        const data =
-            await response.json();
-
-
-        if (
-            !data.reply
-        ) {
-
-            throw new Error(
-                "No reply received"
-            );
-        }
-
-
-        const reply =
-            cleanResponse(
-                data.reply
-            );
-
-
-        // Remove thinking
-
-        stopThinking();
-
-
-        // Teto speaks
-
-        await speakTeto(
+        reply = limit_words(
             reply
-        );
+        )
 
+        # --------------------------------
+        # Save memory
+        # --------------------------------
 
-    } catch (error) {
+        memory.append({
 
-        console.error(
-            error
-        );
+            "role":
+                "user",
 
+            "content":
+                user_message
 
-        stopThinking();
+        })
 
-        closeMouth();
+        memory.append({
 
+            "role":
+                "assistant",
 
-        const errorMessage =
-            document.createElement(
-                "div"
-            );
+            "content":
+                reply
 
+        })
 
-        errorMessage.className =
-            "teto-message";
+        if len(memory) > MAX_MEMORY_MESSAGES:
 
+            memory = memory[
+                -MAX_MEMORY_MESSAGES:
+            ]
 
-        errorMessage.textContent =
-            "I can't connect right now.";
+        with memory_lock:
 
+            save_memory(
+                user_id,
+                memory
+            )
 
-        chat.appendChild(
-            errorMessage
-        );
+        print()
+        print(
+            "[MEMORY] User:",
+            user_id
+        )
 
+        print(
+            "[MEMORY] Messages:",
+            len(memory)
+        )
 
-        await new Promise(
-            resolve =>
-                setTimeout(
-                    resolve,
-                    1500
-                )
-        );
+        # --------------------------------
+        # Send response
+        # --------------------------------
 
+        self.send_response(
+            200
+        )
 
-        errorMessage.remove();
+        self.send_header(
+            "Content-Type",
+            "application/json"
+        )
 
-    }
+        self.send_header(
+            "Cache-Control",
+            "no-store"
+        )
 
+        self.send_header(
+            "Set-Cookie",
+            f"teto_user_id={user_id}; "
+            f"Path=/; "
+            f"HttpOnly; "
+            f"SameSite=Lax"
+        )
 
-    // ====================================
-    // SHOW INPUT AGAIN
-    // ====================================
+        self.end_headers()
 
-    input.disabled =
-        false;
+        self.wfile.write(
 
+            json.dumps({
 
-    sendButton.disabled =
-        false;
+                "reply":
+                    reply
 
+            }).encode()
 
-    inputArea.style.display =
-        "flex";
+        )
 
 
-    input.focus();
-}
+# ========================================
+# RENDER PORT
+# ========================================
 
+PORT = int(
+    os.environ.get(
+        "PORT",
+        8000
+    )
+)
 
-// ========================================
-// SEND BUTTON
-// ========================================
 
-sendButton.addEventListener(
-    "click",
-    sendMessage
-);
-
-
-// ========================================
-// ENTER KEY
-// ========================================
-
-input.addEventListener(
-    "keydown",
-    function(event) {
-
-        if (
-            event.key === "Enter"
-        ) {
-
-            event.preventDefault();
-
-            sendMessage();
-
-        }
-
-    }
-);
-
-
-// ========================================
-// CREATOR MODE
-// ========================================
-
-ownerButton.addEventListener(
-    "click",
-    function() {
-
-        const pin =
-            prompt(
-                "Enter Creator PIN:"
-            );
-
-
-        if (
-            pin === OWNER_PIN
-        ) {
-
-            personalityInput.value =
-                personality;
-
-
-            ownerPanel.style.display =
-                "block";
-
-        } else {
-
-            alert(
-                "ACCESS DENIED."
-            );
-
-        }
-
-    }
-);
-
-
-// ========================================
-// SAVE PERSONALITY
-// ========================================
-
-savePersonality.addEventListener(
-    "click",
-    function() {
-
-        const newPersonality =
-            personalityInput.value.trim();
-
-
-        if (
-            newPersonality === ""
-        ) {
-
-            return;
-        }
-
-
-        personality =
-            newPersonality;
-
-
-        localStorage.setItem(
-            "tetoPersonality",
-            personality
-        );
-
-
-        ownerPanel.style.display =
-            "none";
-
-    }
-);
-
-
-// ========================================
-// CLOSE CREATOR
-// ========================================
-
-closeOwner.addEventListener(
-    "click",
-    function() {
-
-        ownerPanel.style.display =
-            "none";
-
-    }
-);
-
-
-// ========================================
-// INITIAL STATE
-// ========================================
-
-closeMouth();
-
-input.focus();
+# ========================================
+# START
+# ========================================
+
+server = ThreadingHTTPServer(
+
+    (
+        "0.0.0.0",
+        PORT
+    ),
+
+    TetoServer
+
+)
+
+print()
+print("==============================")
+print("        TETO AI ONLINE")
+print("==============================")
+print()
+print("AI:")
+print("Gemini")
+print()
+print("MEMORY:")
+print("Separate memory for every visitor")
+print()
+print("PORT:")
+print(PORT)
+print()
+
+server.serve_forever()
+```
