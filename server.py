@@ -1,3 +1,4 @@
+
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -6,11 +7,16 @@ import urllib.error
 import uuid
 import http.cookies
 import threading
+import mimetypes
 
 
 # ========================================
 # SETTINGS
 # ========================================
+
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
 GEMINI_API_KEY = os.environ.get(
     "GEMINI_API_KEY"
@@ -20,10 +26,6 @@ GEMINI_URL = (
     "https://generativelanguage.googleapis.com/"
     "v1beta/models/gemini-3.5-flash-lite:"
     "generateContent"
-)
-
-BASE_DIR = os.path.dirname(
-    os.path.abspath(__file__)
 )
 
 MEMORY_DIR = os.path.join(
@@ -53,14 +55,89 @@ if not GEMINI_API_KEY:
     print("ERROR: GEMINI_API_KEY missing")
     print("==============================")
     print()
-    print("Run:")
-    print()
-    print('setx GEMINI_API_KEY "YOUR_KEY"')
-    print()
-    print("Then close and reopen Command Prompt.")
-    print()
 
     raise SystemExit
+
+
+# ========================================
+# MEMORY
+# ========================================
+
+def get_memory_file(user_id):
+
+    return os.path.join(
+        MEMORY_DIR,
+        f"user_{user_id}.json"
+    )
+
+
+def load_memory(user_id):
+
+    filename = get_memory_file(
+        user_id
+    )
+
+    if not os.path.exists(filename):
+
+        return []
+
+    try:
+
+        with open(
+            filename,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            data = json.load(f)
+
+            if isinstance(
+                data,
+                list
+            ):
+
+                return data
+
+    except Exception as e:
+
+        print(
+            "[MEMORY LOAD ERROR]",
+            e
+        )
+
+    return []
+
+
+def save_memory(
+    user_id,
+    memory
+):
+
+    filename = get_memory_file(
+        user_id
+    )
+
+    try:
+
+        with open(
+            filename,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                memory,
+                f,
+                indent=2,
+                ensure_ascii=False
+            )
+
+    except Exception as e:
+
+        print(
+            "[MEMORY SAVE ERROR]",
+            e
+        )
 
 
 # ========================================
@@ -77,8 +154,13 @@ def get_user_id(handler):
     cookies = http.cookies.SimpleCookie()
 
     try:
-        cookies.load(cookie_header)
+
+        cookies.load(
+            cookie_header
+        )
+
     except Exception:
+
         pass
 
     if "teto_user_id" in cookies:
@@ -88,114 +170,19 @@ def get_user_id(handler):
         ].value
 
         try:
-            uuid.UUID(user_id)
-            return user_id, False
 
-        except ValueError:
+            uuid.UUID(
+                user_id
+            )
+
+            return user_id
+
+        except Exception:
+
             pass
 
-    user_id = str(
+    return str(
         uuid.uuid4()
-    )
-
-    return user_id, True
-
-
-# ========================================
-# MEMORY FILE
-# ========================================
-
-def get_memory_file(user_id):
-
-    return os.path.join(
-        MEMORY_DIR,
-        f"user_{user_id}.json"
-    )
-
-
-# ========================================
-# LOAD MEMORY
-# ========================================
-
-def load_memory(user_id):
-
-    memory_file = get_memory_file(
-        user_id
-    )
-
-    if not os.path.exists(
-        memory_file
-    ):
-
-        return []
-
-    try:
-
-        with open(
-            memory_file,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            memory = json.load(f)
-
-        if isinstance(
-            memory,
-            list
-        ):
-
-            return memory
-
-    except Exception as e:
-
-        print(
-            "[MEMORY] Load error:",
-            e
-        )
-
-    return []
-
-
-# ========================================
-# SAVE MEMORY
-# ========================================
-
-def save_memory(
-    user_id,
-    memory
-):
-
-    memory_file = get_memory_file(
-        user_id
-    )
-
-    with open(
-        memory_file,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            memory,
-            f,
-            indent=2,
-            ensure_ascii=False
-        )
-
-
-# ========================================
-# WORD LIMIT
-# ========================================
-
-def limit_words(text):
-
-    words = text.split()
-
-    if len(words) <= MAX_WORDS:
-        return text
-
-    return " ".join(
-        words[:MAX_WORDS]
     )
 
 
@@ -211,7 +198,6 @@ def ask_gemini(
 
     contents = []
 
-    # Previous conversation
     for item in memory[-30:]:
 
         role = item.get(
@@ -227,12 +213,16 @@ def ask_gemini(
 
             contents.append({
 
-                "role": "user",
+                "role":
+                    "user",
 
                 "parts": [
+
                     {
-                        "text": content
+                        "text":
+                            content
                     }
+
                 ]
 
             })
@@ -241,49 +231,61 @@ def ask_gemini(
 
             contents.append({
 
-                "role": "model",
+                "role":
+                    "model",
 
                 "parts": [
+
                     {
-                        "text": content
+                        "text":
+                            content
                     }
+
                 ]
 
             })
 
-    # Current message
     contents.append({
 
-        "role": "user",
+        "role":
+            "user",
 
         "parts": [
+
             {
-                "text": user_message
+                "text":
+                    user_message
             }
+
         ]
 
     })
 
-    # Gemini request
-    gemini_data = {
+    data = {
 
         "system_instruction": {
 
             "parts": [
+
                 {
-                    "text": system_prompt
+                    "text":
+                        system_prompt
                 }
+
             ]
 
         },
 
-        "contents": contents,
+        "contents":
+            contents,
 
         "generationConfig": {
 
-            "temperature": 0.7,
+            "temperature":
+                0.7,
 
-            "maxOutputTokens": 180
+            "maxOutputTokens":
+                180
 
         }
 
@@ -300,12 +302,14 @@ def ask_gemini(
         url,
 
         data=json.dumps(
-            gemini_data
+            data
         ).encode("utf-8"),
 
         headers={
+
             "Content-Type":
                 "application/json"
+
         },
 
         method="POST"
@@ -326,34 +330,23 @@ def ask_gemini(
 
     except urllib.error.HTTPError as e:
 
-        error_body = e.read().decode(
+        error = e.read().decode(
             "utf-8",
             errors="ignore"
         )
 
         print(
             "[GEMINI ERROR]",
-            error_body
+            error
         )
 
         raise Exception(
-            f"Gemini HTTP {e.code}: "
-            f"{error_body}"
+            error
         )
 
-    except Exception as e:
-
-        print(
-            "[GEMINI ERROR]",
-            e
-        )
-
-        raise
-
-    # Get reply
     try:
 
-        reply = result[
+        return result[
             "candidates"
         ][0][
             "content"
@@ -361,7 +354,7 @@ def ask_gemini(
             "parts"
         ][0][
             "text"
-        ]
+        ].strip()
 
     except Exception:
 
@@ -371,10 +364,25 @@ def ask_gemini(
         )
 
         raise Exception(
-            "Gemini returned an unexpected response."
+            "Invalid Gemini response"
         )
 
-    return reply.strip()
+
+# ========================================
+# LIMIT WORDS
+# ========================================
+
+def limit_words(text):
+
+    words = text.split()
+
+    if len(words) <= MAX_WORDS:
+
+        return text
+
+    return " ".join(
+        words[:MAX_WORDS]
+    )
 
 
 # ========================================
@@ -384,6 +392,131 @@ def ask_gemini(
 class TetoServer(
     SimpleHTTPRequestHandler
 ):
+
+    # ------------------------------------
+    # WEBSITE
+    # ------------------------------------
+
+    def do_GET(self):
+
+        requested_path = self.path.split(
+            "?",
+            1
+        )[0]
+
+        if requested_path == "/":
+
+            requested_path = "/index.html"
+
+        relative_path = requested_path.lstrip(
+            "/"
+        )
+
+        full_path = os.path.join(
+            BASE_DIR,
+            relative_path
+        )
+
+        full_path = os.path.abspath(
+            full_path
+        )
+
+        # Security: don't allow paths
+        # outside the project folder.
+
+        if not full_path.startswith(
+            os.path.abspath(BASE_DIR)
+        ):
+
+            self.send_error(
+                403
+            )
+
+            return
+
+        if os.path.isfile(
+            full_path
+        ):
+
+            try:
+
+                with open(
+                    full_path,
+                    "rb"
+                ) as f:
+
+                    content = f.read()
+
+                content_type = (
+                    mimetypes.guess_type(
+                        full_path
+                    )[0]
+                    or
+                    "application/octet-stream"
+                )
+
+                self.send_response(
+                    200
+                )
+
+                self.send_header(
+                    "Content-Type",
+                    content_type
+                )
+
+                self.send_header(
+                    "Content-Length",
+                    str(len(content))
+                )
+
+                self.end_headers()
+
+                self.wfile.write(
+                    content
+                )
+
+                return
+
+            except Exception as e:
+
+                print(
+                    "[FILE ERROR]",
+                    e
+                )
+
+        # Debug information
+        # if the file doesn't exist.
+
+        print(
+            "[404] File not found:",
+            full_path
+        )
+
+        print(
+            "[BASE DIR]:",
+            BASE_DIR
+        )
+
+        try:
+
+            print(
+                "[FILES]:",
+                os.listdir(BASE_DIR)
+            )
+
+        except Exception:
+
+            pass
+
+        self.send_error(
+            404,
+            "File not found"
+        )
+
+
+    # ------------------------------------
+    # CHAT
+    # ------------------------------------
 
     def do_POST(self):
 
@@ -395,19 +528,16 @@ class TetoServer(
 
             return
 
-        # Get visitor ID
-        user_id, is_new = get_user_id(
+        user_id = get_user_id(
             self
         )
 
-        # Load this visitor's memory
         with memory_lock:
 
             memory = load_memory(
                 user_id
             )
 
-        # Read request
         try:
 
             length = int(
@@ -428,8 +558,7 @@ class TetoServer(
         except Exception:
 
             self.send_error(
-                400,
-                "Invalid request"
+                400
             )
 
             return
@@ -447,21 +576,23 @@ class TetoServer(
         if not user_message:
 
             self.send_error(
-                400,
-                "Empty message"
+                400
             )
 
             return
 
-        # Check repetition
         previous_messages = [
 
-            x.get("content", "")
+            x.get(
+                "content",
+                ""
+            )
 
             for x in memory
 
-            if x.get("role")
-            == "user"
+            if x.get(
+                "role"
+            ) == "user"
 
         ]
 
@@ -470,16 +601,11 @@ class TetoServer(
             memory_note = """
 The user has said this exact message before.
 Notice the repetition naturally.
-Do not pretend it is the first time.
 """
 
         else:
 
             memory_note = ""
-
-        # =================================
-        # TETO PERSONALITY
-        # =================================
 
         system_prompt = f"""
 You are Kasane Teto.
@@ -494,16 +620,10 @@ Be friendly, casual and conversational.
 
 You have memory of this conversation.
 
-Remember information the user tells you
-and use it naturally later when relevant.
-
-If the user repeats something,
-you can notice that you have heard it before.
+Remember things the user tells you and use them
+naturally when relevant.
 
 You do NOT know the lyrics to your own songs.
-
-You do NOT automatically know song lyrics
-just because they are associated with Kasane Teto.
 
 Never spontaneously write lyrics.
 
@@ -516,8 +636,7 @@ Never talk about being an AI unless directly asked.
 Never talk about pixels or being pixelated
 unless directly asked.
 
-Never talk about being digital
-unless directly asked.
+Never talk about being digital unless directly asked.
 
 Never describe physical actions.
 
@@ -527,21 +646,14 @@ Never use [actions].
 
 Never narrate what you are doing.
 
-Keep responses short.
+Keep replies short.
 
 Normally use 1 to 3 sentences.
 
 Never exceed 100 words.
 
-Do not make every response a paragraph.
-
-Sound like an ordinary person having
-a normal conversation.
+Sound like a normal person.
 """
-
-        # =================================
-        # ASK GEMINI
-        # =================================
 
         try:
 
@@ -557,6 +669,11 @@ a normal conversation.
 
         except Exception as e:
 
+            print(
+                "[CHAT ERROR]",
+                e
+            )
+
             self.send_response(
                 500
             )
@@ -564,11 +681,6 @@ a normal conversation.
             self.send_header(
                 "Content-Type",
                 "application/json"
-            )
-
-            self.send_header(
-                "Access-Control-Allow-Origin",
-                "*"
             )
 
             self.end_headers()
@@ -586,17 +698,9 @@ a normal conversation.
 
             return
 
-        # =================================
-        # WORD LIMIT
-        # =================================
-
         reply = limit_words(
             reply
         )
-
-        # =================================
-        # SAVE MEMORY
-        # =================================
 
         memory.append({
 
@@ -631,20 +735,11 @@ a normal conversation.
                 memory
             )
 
-        print()
         print(
-            "[MEMORY] User:",
-            user_id
-        )
-
-        print(
-            "[MEMORY] Messages:",
+            "[MEMORY]",
+            user_id,
             len(memory)
         )
-
-        # =================================
-        # SEND RESPONSE
-        # =================================
 
         self.send_response(
             200
@@ -683,18 +778,14 @@ a normal conversation.
 
 
 # ========================================
-# START SERVER
+# START
 # ========================================
 
-server = ThreadingHTTPServer(
-
-    (
-        "0.0.0.0",
+PORT = int(
+    os.environ.get(
+        "PORT",
         8000
-    ),
-
-    TetoServer
-
+    )
 )
 
 print()
@@ -702,17 +793,45 @@ print("==============================")
 print("        TETO AI ONLINE")
 print("==============================")
 print()
-print("AI:")
-print("Gemini 3.5 Flash-Lite")
+print("BASE DIRECTORY:")
+print(BASE_DIR)
 print()
-print("MEMORY:")
-print("Separate memory for every visitor")
+print("PORT:")
+print(PORT)
 print()
-print("MEMORY FOLDER:")
-print(MEMORY_DIR)
-print()
-print("Open:")
-print("http://127.0.0.1:8000")
+print("FILES:")
+
+try:
+
+    for filename in os.listdir(
+        BASE_DIR
+    ):
+
+        print(
+            " -",
+            filename
+        )
+
+except Exception as e:
+
+    print(
+        "Could not list files:",
+        e
+    )
+
 print()
 
+server = ThreadingHTTPServer(
+
+    (
+        "0.0.0.0",
+        PORT
+    ),
+
+    TetoServer
+
+)
+
 server.serve_forever()
+
+
