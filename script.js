@@ -1,4 +1,4 @@
-```python
+
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -803,4 +803,4 @@ print(PORT)
 print()
 
 server.serve_forever()
-```
+
