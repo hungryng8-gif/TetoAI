@@ -1,0 +1,349 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+
+    overflow: hidden;
+
+    background: white;
+
+    font-family:
+        "Courier New",
+        monospace;
+}
+
+
+.container {
+    width: 100vw;
+    height: 100vh;
+
+    position: relative;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+}
+
+
+/* ========================================
+   TETO
+======================================== */
+
+#teto {
+    width: 280px;
+
+    height: auto;
+
+    image-rendering: pixelated;
+
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    transform:
+        translate(-50%, -50%);
+}
+
+
+/* ========================================
+   TETO'S TEXT
+======================================== */
+
+#chat {
+    position: absolute;
+
+    left: 50%;
+
+    top: calc(50% - 240px);
+
+    transform:
+        translateX(-50%);
+
+    width: 100%;
+
+    text-align: center;
+
+    pointer-events: none;
+
+    padding: 0 20px;
+}
+
+
+.teto-message {
+    margin: 0 auto;
+
+    color: black;
+
+    background: transparent;
+
+    border: none;
+
+    padding: 0;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 25px;
+
+    font-weight: bold;
+
+    letter-spacing: 1px;
+
+    /*
+       Allow long sentences to wrap
+       instead of going off-screen.
+    */
+
+    white-space: normal;
+
+    max-width: 85vw;
+
+    overflow-wrap: break-word;
+
+    word-wrap: break-word;
+
+    text-align: center;
+
+    text-shadow:
+        1px 1px 0 white,
+        -1px -1px 0 white,
+        1px -1px 0 white,
+        -1px 1px 0 white;
+}
+
+
+/* ========================================
+   INPUT AREA
+======================================== */
+
+.input-area {
+    position: absolute;
+
+    left: 50%;
+
+    bottom: 35px;
+
+    transform:
+        translateX(-50%);
+
+    display: flex;
+
+    width:
+        min(600px, 90vw);
+}
+
+
+/* ========================================
+   INPUT BOX
+======================================== */
+
+#messageInput {
+    flex: 1;
+
+    height: 45px;
+
+    padding:
+        8px 12px;
+
+    border:
+        2px solid black;
+
+    border-radius: 0;
+
+    outline: none;
+
+    background: white;
+
+    color: black;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 17px;
+}
+
+
+/* ========================================
+   SEND BUTTON
+======================================== */
+
+#sendButton {
+    height: 45px;
+
+    padding:
+        0 18px;
+
+    border:
+        2px solid black;
+
+    border-left: none;
+
+    border-radius: 0;
+
+    background: black;
+
+    color: white;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    cursor: pointer;
+}
+
+
+#sendButton:disabled {
+    cursor: default;
+}
+
+
+/* ========================================
+   CREATOR BUTTON
+======================================== */
+
+#ownerButton {
+    position: absolute;
+
+    right: 15px;
+
+    top: 15px;
+
+    padding:
+        7px 10px;
+
+    background: white;
+
+    color: black;
+
+    border:
+        2px solid black;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    cursor: pointer;
+}
+
+
+/* ========================================
+   CREATOR PANEL
+======================================== */
+
+#ownerPanel {
+    display: none;
+
+    position: fixed;
+
+    z-index: 100;
+
+    left: 50%;
+
+    top: 50%;
+
+    transform:
+        translate(-50%, -50%);
+
+    width: 500px;
+
+    max-width: 90vw;
+
+    padding: 20px;
+
+    background: white;
+
+    border:
+        3px solid black;
+}
+
+
+/* ========================================
+   PERSONALITY BOX
+======================================== */
+
+#personalityInput {
+    width: 100%;
+
+    height: 250px;
+
+    resize: none;
+
+    padding: 10px;
+
+    border:
+        2px solid black;
+
+    outline: none;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    font-size: 14px;
+}
+
+
+/* ========================================
+   CREATOR PANEL BUTTONS
+======================================== */
+
+#savePersonality,
+#closeOwner {
+    margin-top: 10px;
+
+    padding:
+        8px 14px;
+
+    border:
+        2px solid black;
+
+    background: white;
+
+    color: black;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    cursor: pointer;
+}
+
+
+/* ========================================
+   SMALL SCREENS
+======================================== */
+
+@media (max-width: 600px) {
+
+    #teto {
+        width: 230px;
+    }
+
+
+    #chat {
+        top: calc(50% - 200px);
+
+        padding:
+            0 10px;
+    }
+
+
+    .teto-message {
+        font-size: 20px;
+
+        max-width: 90vw;
+    }
+
+
+    .input-area {
+        width: 90vw;
+    }
+}

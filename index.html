@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Teto AI</title>
+
+    <link rel="stylesheet"
+          href="style.css">
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Teto -->
+
+        <img
+            id="teto"
+            src="assets/teto.gif"
+            alt="Teto"
+        >
+
+
+        <!-- Text above Teto -->
+
+        <div id="chat"></div>
+
+
+        <!-- Input -->
+
+        <div class="input-area">
+
+            <input
+                id="messageInput"
+                type="text"
+                placeholder="Talk to Teto..."
+                autocomplete="off"
+            >
+
+            <button
+                id="sendButton"
+            >
+                SEND
+            </button>
+
+        </div>
+
+
+        <!-- Creator button -->
+
+        <button
+            id="ownerButton"
+        >
+            CREATOR
+        </button>
+
+
+        <!-- Creator panel -->
+
+        <div
+            id="ownerPanel"
+        >
+
+            <h2>Teto Personality</h2>
+
+            <textarea
+                id="personalityInput"
+            ></textarea>
+
+            <br>
+
+            <button
+                id="savePersonality"
+            >
+                SAVE
+            </button>
+
+            <button
+                id="closeOwner"
+            >
+                CLOSE
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
